@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  nexus:
+    image: sonatype/nexus3:3.96.0
+    container_name: nexus
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./nexus/data:/nexus-data
+    environment:
+      - INSTALL4J_ADD_VM_PARAMS=-Xms1024m -Xmx2048m -XX:MaxDirectMemorySize=2048m
+    networks:
+      - package-mirror
+
+networks:
+  package-mirror:
+    driver: bridge

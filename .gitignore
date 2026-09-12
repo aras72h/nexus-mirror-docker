@@ -1,0 +1,21 @@
+# Storage directories
+nexus/data/
+
+# Environment files with secrets
+.env
+.env.local
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db
