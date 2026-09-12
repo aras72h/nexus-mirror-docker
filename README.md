@@ -1,361 +1,149 @@
-# Package Mirror Setup (npm/pnpm + pip/uv)
+# Local Package Mirror
 
-Pull-through cache for npm/pnpm and pip/uv packages using Nexus Repository Manager.
+A self-hosted, offline-capable pull-through cache for npm, PyPI, and APT packages using [Nexus Repository Manager](https://www.sonatype.com/products/sonatype-nexus-repository).
 
-## Services
+Designed for environments with unreliable internet access. Once a package is fetched, it is served from local storage indefinitely — no internet required on subsequent installs.
 
-- **Nexus Repository Manager**: `http://MIRROR_SERVER_IP:8081`
-  - npm/pnpm proxy: `http://MIRROR_SERVER_IP:8081/repository/npm-proxy/`
-  - PyPI proxy: `http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple`
-  - APT Ubuntu 24.04 (main): `http://MIRROR_SERVER_IP:8081/repository/ubuntu-noble-proxy/`
-  - APT Ubuntu 24.04 (security): `http://MIRROR_SERVER_IP:8081/repository/ubuntu-noble-security-proxy/`
-  - APT Debian 12 (main): `http://MIRROR_SERVER_IP:8081/repository/debian-bookworm-proxy/`
-  - APT Debian 12 (security): `http://MIRROR_SERVER_IP:8081/repository/debian-bookworm-security-proxy/`
+## What's Included
 
-## Quick Start
+| Format | Tool(s) | Upstream |
+|--------|---------|----------|
+| npm | npm, pnpm, yarn | registry.npmjs.org |
+| Python | pip, uv | pypi.org |
+| APT | apt, apt-get | Ubuntu 24.04 + Debian 12 |
 
-### 1. Start Services
+All formats are served through a single **Nexus Repository Manager** instance.
 
-```cmd
-docker-compose up -d
+## Requirements
+
+- Docker + Docker Compose v2
+- 2–3 GB RAM available for Nexus
+- 10–50 GB disk space (depends on cache size)
+
+## Getting Started
+
+Copy the environment file and set your server's IP:
+
+```bash
+cp .env.example .env
+# Edit .env and set SERVER_IP to your machine's LAN IP
 ```
 
-### 2. Check Status
+Start Nexus:
 
-```cmd
-docker-compose ps
-docker-compose logs -f
+```bash
+docker compose up -d
 ```
 
-### 3. Wait for Nexus to Initialize
+Then follow **[QUICK-START.md](QUICK-START.md)** to create repositories and configure your first client in ~10 minutes.
 
-- **Nexus**: First startup takes 2-3 minutes
-- Check logs: `docker-compose logs -f nexus`
-- Ready when you see: "Started Sonatype Nexus"
+## Documentation
 
----
+| File | What it covers |
+|------|---------------|
+| [QUICK-START.md](QUICK-START.md) | End-to-end setup from zero to working mirror |
+| [NEXUS-NPM-SETUP.md](NEXUS-NPM-SETUP.md) | Detailed npm/pnpm proxy configuration in Nexus |
+| [NEXUS-SETUP.md](NEXUS-SETUP.md) | Detailed PyPI proxy configuration in Nexus |
+| [NEXUS-APT-SETUP.md](NEXUS-APT-SETUP.md) | APT proxy setup for Ubuntu 24.04 and Debian 12 |
+| [CLIENT-SETUP.md](CLIENT-SETUP.md) | Configuring npm, pip, uv on client machines |
+| [COMPARISON.md](COMPARISON.md) | Why Nexus over Verdaccio, pypiserver, apt-cacher-ng |
 
-## Nexus Initial Setup
+## Service URLs
 
-### Access Web UI
-- URL: `http://MIRROR_SERVER_IP:4873`
-- No login required for reading packages
-- Login required for publishing private packages
+Replace `MIRROR_SERVER_IP` with your server's LAN IP (set in `.env`).
 
-### Configure npm to Use Mirror
+| Service | URL |
+|---------|-----|
+| Nexus Web UI | `http://MIRROR_SERVER_IP:8081` |
+| npm / pnpm | `http://MIRROR_SERVER_IP:8081/repository/npm-proxy/` |
+| pip / uv | `http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple` |
+| APT Ubuntu 24.04 (main) | `http://MIRROR_SERVER_IP:8081/repository/ubuntu-noble-proxy/` |
+| APT Ubuntu 24.04 (security) | `http://MIRROR_SERVER_IP:8081/repository/ubuntu-noble-security-proxy/` |
+| APT Debian 12 (main) | `http://MIRROR_SERVER_IP:8081/repository/debian-bookworm-proxy/` |
+| APT Debian 12 (security) | `http://MIRROR_SERVER_IP:8081/repository/debian-bookworm-security-proxy/` |
 
-**Option 1: Global Configuration (All Projects)**
-```cmd
-npm config set registry http://MIRROR_SERVER_IP:4873
+## Quick Client Config
+
+### npm / pnpm
+
+```bash
+npm config set registry http://MIRROR_SERVER_IP:8081/repository/npm-proxy/
+pnpm config set registry http://MIRROR_SERVER_IP:8081/repository/npm-proxy/
 ```
 
-**Option 2: Per-Project (.npmrc in project root)**
-```
-registry=http://MIRROR_SERVER_IP:4873
-```
+### pip
 
-**Option 3: Environment Variable**
-```cmd
-set NPM_CONFIG_REGISTRY=http://MIRROR_SERVER_IP:4873
-npm install
-```
-
-### Configure pnpm to Use Mirror
-
-**Global Configuration**
-```cmd
-pnpm config set registry http://MIRROR_SERVER_IP:4873
-```
-
-**Per-Project (.npmrc in project root)**
-```
-registry=http://MIRROR_SERVER_IP:4873
-```
-
-### Test npm Cache
-
-```cmd
-npm install express
-```
-
-First install fetches from npmjs.org and caches locally. Subsequent installs are served from cache.
-
-### Publishing Private Packages (Optional)
-
-1. Create user:
-```cmd
-npm adduser --registry http://MIRROR_SERVER_IP:4873
-```
-
-2. Publish:
-```cmd
-npm publish --registry http://MIRROR_SERVER_IP:4873
-```
-
----
-
-## Nexus Setup (pip/uv)
-
-### Initial Setup
-
-1. **Access Web UI**: `http://MIRROR_SERVER_IP:8081`
-
-2. **Get Initial Admin Password**:
-```cmd
-docker exec nexus cat /nexus-data/admin.password
-```
-
-3. **Login**:
-   - Username: `admin`
-   - Password: (from step 2)
-
-4. **Complete Setup Wizard**:
-   - Change admin password
-   - Enable anonymous access (recommended for pull-through cache)
-   - Keep default settings
-
-### Create PyPI Proxy Repository
-
-1. **Go to**: Settings (gear icon) → Repository → Repositories → Create repository
-
-2. **Select**: `pypi (proxy)`
-
-3. **Configure**:
-   - **Name**: `pypi-proxy`
-   - **Remote storage**: `https://pypi.org`
-   - **Maximum component age**: `180` (days)
-   - **Maximum metadata age**: `1440` (minutes)
-   - **Negative cache enabled**: ✓
-   - **Negative cache TTL**: `1440` (minutes)
-   - **Blob store**: `default`
-
-4. **Save**
-
-### Configure pip to Use Mirror
-
-**Option 1: Global Configuration**
-
-Create/edit `%APPDATA%\pip\pip.ini`:
 ```ini
+# %APPDATA%\pip\pip.ini  (Windows)
+# ~/.config/pip/pip.conf  (Linux/macOS)
 [global]
 index-url = http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple
 trusted-host = MIRROR_SERVER_IP
 ```
 
-**Option 2: Per-Project (requirements.txt)**
-```
---index-url http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple
---trusted-host MIRROR_SERVER_IP
+### uv
 
-requests
-flask
+```bash
+# Set once, applies to all uv commands
+export UV_INDEX_URL=http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple
 ```
 
-**Option 3: Command Line**
-```cmd
-pip install --index-url http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple --trusted-host MIRROR_SERVER_IP requests
+See [CLIENT-SETUP.md](CLIENT-SETUP.md) for per-project and Windows-specific instructions.
+
+## Managing the Service
+
+### Stop and start
+
+```bash
+docker compose stop
+docker compose start
 ```
 
-### Configure uv to Use Mirror
+### Restart
 
-**Environment Variable**
-```cmd
-set UV_INDEX_URL=http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple
-uv pip install requests
+```bash
+docker compose restart
 ```
 
-**Or in pyproject.toml**
-```toml
-[[tool.uv.index]]
-url = "http://MIRROR_SERVER_IP:8081/repository/pypi-proxy/simple"
-default = true
+### Remove containers (keeps cached data)
+
+```bash
+docker compose down
 ```
 
-### Test pip Cache
+### Remove containers and all cached data
 
-```cmd
-pip install requests
+```bash
+docker compose down -v
 ```
 
-First install fetches from pypi.org and caches in Nexus. Subsequent installs are instant.
+> ⚠️ `down -v` deletes the entire Nexus blob store. All cached packages will need to be re-fetched from the internet.
 
 ---
 
-## Cache Management
+## Clearing the Cache
 
-### Cache Retention
-- **Default**: 180 days (6 months)
-- Both services configured to keep packages for 6 months
-- Packages accessed within 6 months stay cached
+### Invalidate a single repository's cache
 
-### Verdaccio Cache Location
-- Path: `./verdaccio/storage/data`
-- View cache stats on web UI
+1. Nexus Web UI → Repository → Repositories
+2. Select the repository (e.g. `npm-proxy`)
+3. Click **Invalidate cache**
 
-### Nexus Cache Location
-- Path: `./nexus/data/blobs`
-- View cache stats: Settings → System → Blob Stores
+### Invalidate via scheduled task
 
-### Clear Cache
+1. Settings (⚙️) → System → Tasks → Create task
+2. Select: `Invalidate cached data`
+3. Configure the target repository and schedule
+4. Save and run
 
-**Verdaccio**: Delete storage directory (while stopped)
-```cmd
-docker-compose stop verdaccio
-rmdir /s /q verdaccio\storage\data
-docker-compose start verdaccio
-```
+### Rebuild metadata only (without deleting blobs)
 
-**Nexus**: Use web UI
-1. Repository → Select repository
-2. Repair - Invalidate cache
-3. Or: Settings → Tasks → Create task → "Invalidate cache"
+1. Settings (⚙️) → System → Tasks → Create task
+2. Select: `Repair - Rebuild repository browse`
+3. Run manually as needed
 
 ---
 
-## Monitoring
+## License
 
-### Check Service Health
-
-```cmd
-# Verdaccio
-curl http://MIRROR_SERVER_IP:4873
-
-# Nexus
-curl http://MIRROR_SERVER_IP:8081
-```
-
-### View Logs
-
-```cmd
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f verdaccio
-docker-compose logs -f nexus
-```
-
-### Disk Usage
-
-```cmd
-# Check storage size
-dir verdaccio\storage
-dir nexus\data
-```
-
----
-
-## Backup
-
-### Verdaccio Backup
-```cmd
-docker-compose stop verdaccio
-xcopy verdaccio\storage verdaccio-backup\ /E /I
-docker-compose start verdaccio
-```
-
-### Nexus Backup
-Use Nexus built-in backup task:
-1. Settings → System → Tasks
-2. Create task → "Admin - Export databases for backup"
-3. Or backup entire `nexus/data` directory
-
----
-
-## Troubleshooting
-
-### Verdaccio Not Starting
-- Check ports: `netstat -an | findstr 4873`
-- Check logs: `docker-compose logs verdaccio`
-
-### Nexus Not Starting
-- Needs 2GB+ RAM
-- Check logs: `docker-compose logs nexus`
-- First startup takes 2-3 minutes
-
-### npm/pip Not Using Cache
-- Verify configuration: `npm config get registry`
-- Test connectivity: `curl http://MIRROR_SERVER_IP:4873`
-- Check firewall rules
-
-### Packages Not Caching
-- Verify uplink configuration in Verdaccio
-- Check Nexus proxy repository settings
-- Review retention policies
-
----
-
-## Security Notes
-
-### Production Recommendations
-
-1. **Change default passwords**
-2. **Enable HTTPS** (use reverse proxy like nginx/traefik)
-3. **Configure authentication** for publishing
-4. **Set up firewall rules**
-5. **Regular backups**
-
-### Nexus Security
-- Change admin password immediately after first login
-- Consider disabling anonymous access if security is critical
-- Enable HTTPS in production
-
-### Verdaccio Security
-- Enable authentication for publishing
-- Limit user registration (`max_users` in config)
-- Use htpasswd for user management
-
----
-
-## Advanced Configuration
-
-### Verdaccio Plugins
-Add plugins to `verdaccio/plugins/` directory and configure in `config.yaml`.
-
-### Nexus Additional Repositories
-Nexus can also proxy:
-- Docker Hub
-- Maven Central
-- NuGet Gallery
-- RubyGems
-- And more...
-
----
-
-## System Requirements
-
-- **CPU**: 2+ cores recommended
-- **RAM**: 3-4GB (1GB Verdaccio + 2-3GB Nexus)
-- **Disk**: Depends on cache size
-  - Estimate: 1-10GB for typical usage
-  - 50GB+ for heavy usage
-
----
-
-## Stopping Services
-
-```cmd
-# Stop all
-docker-compose stop
-
-# Stop specific service
-docker-compose stop verdaccio
-docker-compose stop nexus
-```
-
-## Removing Services
-
-```cmd
-# Stop and remove containers
-docker-compose down
-
-# Remove with volumes (WARNING: deletes cache)
-docker-compose down -v
-```
-
----
-
-## Support & Documentation
-
-- **Verdaccio**: https://verdaccio.org/docs/
-- **Nexus**: https://help.sonatype.com/repomanager3
+MIT
